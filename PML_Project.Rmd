@@ -1,0 +1,133 @@
+---
+title: 'Practical Machine Learning Project'
+output: html_document
+keep_md: yes
+---
+
+##Background
+Using devices such as Jawbone Up, Nike FuelBand and Fitbit, it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+##Objectives
+The goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. Any of the other variables may be used to predict with. 
+
+##Set working directory
+setwd("C:/BT/MOOC/8. Practical Machine Learning/Project Writeup")
+
+##Read data
+```{r}
+set.seed(1580)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+trainingData <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+summary(trainingData)
+testingData <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+summary(testingData)
+table(trainingData$classe)
+```
+
+##Clean data
+```{r}
+#Exclude near zero variance Variables
+nzvColumn <- nearZeroVar(trainingData)
+trainingData <- trainingData[, -nzvColumn]
+#exclude columns with 40% or more missing values
+cntLength <- sapply(trainingData,function(x){sum(!(is.na(x)|x==""))})
+nullCol <- names(cntLength[cntLength < 0.6 * length(trainingData$classe)])
+#exclude columns for classification 
+desCol <- c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window")
+excludeCol <- c(desCol, nullCol)
+trainingData <- trainingData[,!names(trainingData) %in% excludeCol]
+dim(trainingData)
+```
+
+##Partition the data into 60% training and 40% test data
+```{r}
+inTrain <- createDataPartition(y=trainingData$classe, p=0.6, list=FALSE)
+training <- trainingData[inTrain, ]; testing <- trainingData[-inTrain, ]
+dim(training); dim(testing)
+```
+
+##Model building
+This section describes how the model is built. Two algorithms, namely Decision Tree and Random Forests, are explored.  
+
+##Decision Tree algorithm
+```{r}
+modFitDT <- rpart(classe ~ ., data=training, method="class")
+fancyRpartPlot(modFitDT)
+```
+
+##Random Forests algorithm
+```{r}
+modFitRF <- randomForest(classe ~. , data=training)
+```
+
+##Cross Validation
+We will perform test using the training data and cross validation with test data. 
+
+##Predicting with Decision Tree with training data:
+```{r}
+predictDTt <- predict(modFitDT, training, type = "class")
+```
+
+Confusion Matrix:
+```{r}
+confusionMatrix(predictDTt, training$classe)
+```
+
+##Predicting with Decision Tree with test data:
+```{r}
+predictDT <- predict(modFitDT, testing, type = "class")
+```
+
+Confusion Matrix:
+```{r}
+confusionMatrix(predictDT, testing$classe)
+```
+
+##Predicting with Random Forest with training data:
+```{r}
+predictRFt <- predict(modFitRF, training, type = "class")
+```
+Confusion Matrix :
+```{r}
+confusionMatrix(predictRFt, training$classe)
+```
+
+##Predicting with Random Forest with test data:
+```{r}
+predictRF <- predict(modFitRF, testing, type = "class")
+```
+Confusion Matrix :
+```{r}
+confusionMatrix(predictRF, testing$classe)
+```
+
+As can be seen from the result, the cross validation accuracy for Random Forest algorithm of 99.4% and out of sample error of 0.5% compared to Decision Tree algorithm accuracy of 73.6% and out of sample error of 0.47% shows that Random Forests algorithm provides more accurate prediction.
+
+##Prediction
+This section uses the prediction model to predict 20 different test cases.  
+We will use Random Forests algorithm to carry out the prediction which has been shown to be more accurate.
+```{r}
+predictTC <- predict(modFitRF, testingData, type = "class")
+predictTC
+```
+
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(predictTC)
+```
+
+```{r sessionInfo}
+sessionInfo()
+```
